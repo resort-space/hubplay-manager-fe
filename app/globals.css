@@ -1,0 +1,13 @@
+@import "tailwindcss";
+
+body { margin: 0; }
+.slot-on { outline: 2px solid #e8c56b; color: #e8c56b; }
+.btn-gold { background: #e8c56b; color: #1a1408; }
+.btn-gold:hover { background: #f0d48a; }
+@page { size: 80mm auto; margin: 2mm; }
+@media print {
+  body * { visibility: hidden; }
+  #bill-print, #bill-print * { visibility: visible; }
+  #bill-print { position: absolute; left: 0; top: 0; width: 72mm; font-family: ui-monospace, monospace; font-size: 12px; color: #000; background: #fff; }
+}
+#bill-print { position: fixed; left: -200vw; top: 0; width: 72mm; }
