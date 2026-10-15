@@ -21,7 +21,8 @@ export function ConfirmDialog({
 }) {
   const [container, setContainer] = useState<HTMLElement | null>(null);
   useEffect(() => {
-    setContainer(document.querySelector('.admin'));
+    const found = document.querySelector('.admin');
+    setContainer(found instanceof HTMLElement ? found : null);
   }, []);
 
   return (
