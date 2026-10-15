@@ -6,7 +6,7 @@ import type { Room, Slot } from '@/lib/types';
 
 const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-export function BookingModal({ room, onClose }: { room: Room; onClose: () => void }) {
+export function BookingModal({ room, venueId, onClose }: { room: Room; venueId: string; onClose: () => void }) {
   const [anchor, setAnchor] = useState(() => new Date());
   const [date, setDate] = useState(isoDate(new Date()));
   const [slots, setSlots] = useState<Slot[]>([]);
@@ -22,8 +22,9 @@ export function BookingModal({ room, onClose }: { room: Room; onClose: () => voi
   const week = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(anchor, i - ((anchor.getDay() + 6) % 7))), [anchor]);
 
   useEffect(() => {
-    api<Slot[]>(`/api/v1/slots?roomId=${room.id}&date=${date}`).then(setSlots).catch((e) => setError(e.message));
-  }, [room.id, date]);
+    if (!venueId) return;
+    api<Slot[]>(`/api/v1/slots?roomId=${room.id}&date=${date}&venueId=${encodeURIComponent(venueId)}`).then(setSlots).catch((e) => setError(e.message));
+  }, [room.id, date, venueId]);
 
   function toggle(slot: Slot) {
     if (slot.reserved) return;
@@ -41,7 +42,7 @@ export function BookingModal({ room, onClose }: { room: Room; onClose: () => voi
     try {
       await api('/api/v1/bookings', {
         method: 'POST',
-        body: JSON.stringify({ roomId: room.id, date, slotIndexes: picked, guestName, email, phone, playerCount, note }),
+        body: JSON.stringify({ roomId: room.id, date, slotIndexes: picked, guestName, email, phone, playerCount, note, venueId }),
       });
       setDone(true);
     } catch (e) {
@@ -57,7 +58,7 @@ export function BookingModal({ room, onClose }: { room: Room; onClose: () => voi
           <button onClick={onClose} className="text-stone-400">×</button>
         </div>
         {done ? (
-          <p>Chờ quán xác nhận. Nhân viên Door Escape Room sẽ gọi số {phone}.</p>
+          <p>Chờ quán xác nhận. Nhân viên Door Escape sẽ gọi số {phone}.</p>
         ) : (
           <>
             <p className="mb-2 text-sm text-stone-400">Chọn ngày</p>

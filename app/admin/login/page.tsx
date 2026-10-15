@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
 
 export default function AdminLoginPage() {
@@ -11,7 +12,7 @@ export default function AdminLoginPage() {
   const [error, setError] = useState('');
   return (
     <form
-      className="mx-auto mt-24 grid max-w-sm gap-3 rounded-xl bg-white p-6 shadow"
+      className="admin-card mx-auto mt-16 grid max-w-sm gap-3 sm:mt-24"
       onSubmit={async (e) => {
         e.preventDefault();
         try {
@@ -22,12 +23,16 @@ export default function AdminLoginPage() {
         }
       }}
     >
-      <h1 className="text-xl font-bold">Đăng nhập quản trị</h1>
-      <input className="rounded border px-3 py-2" value={username} onChange={(e) => setUsername(e.target.value)} />
-      <input className="rounded border px-3 py-2" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+      <h1 className="admin-title">Đăng nhập quản trị</h1>
+      <label className="admin-label">Tài khoản
+        <input className="admin-input mt-1" value={username} onChange={(e) => setUsername(e.target.value)} />
+      </label>
+      <label className="admin-label">Mật khẩu
+        <input className="admin-input mt-1" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+      </label>
       {error && <p className="text-sm text-red-600">{error}</p>}
-      <button className="rounded bg-blue-600 px-4 py-2 text-white">Vào</button>
-      <p className="text-xs text-slate-500">Dev: quay, editadmin, sysadmin / Admin@123</p>
+      <Button type="submit">Vào</Button>
+      <p className="admin-muted">Dev: quay, editadmin, sysadmin / Admin@123</p>
     </form>
   );
 }

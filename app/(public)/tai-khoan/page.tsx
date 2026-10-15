@@ -65,7 +65,7 @@ export default function AccountPage() {
           {r.bills.flatMap((b) => b.lines).map((line) => (
             <p key={line.description + line.unitPrice}>{line.description} x{line.qty} · {vnd(line.qty * line.unitPrice)} đ</p>
           ))}
-          <p className="text-stone-400">{r.payments.map((p) => `${p.method} ${vnd(p.amount)}`).join(', ')}</p>
+          <p className="text-stone-400">{r.venue.name} · {r.payments.map((p) => `${p.method} ${vnd(p.amount)}`).join(', ')}</p>
         </div>
       ))}
       {tab === 'anh' && (

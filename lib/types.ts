@@ -1,4 +1,4 @@
-export type Venue = { id: string; code: string; name: string; address: string; phone: string };
+export type Venue = { id: string; code: string; name: string; address: string; phone: string; active?: boolean };
 export type Room = { id: string; name: string; code: string; capacity: number; description: string; active: boolean };
 export type Slot = { id: string; slotIndex: number; startTime: string; endTime: string; enabled: boolean; reserved?: boolean };
 export type SubGame = {
@@ -13,12 +13,14 @@ export type SubGame = {
   room?: Room | null;
 };
 export type Drink = { id: string; name: string; price: number; active: boolean };
+export type DiscountCode = { id: string; code: string; amount: number; active: boolean };
 export type Cms = { guide: string; priceNote: string; reviews: string } | null;
 export type HomeData = {
   venue: Venue;
   rooms: Room[];
   slots: Slot[];
   drinks: Drink[];
+  discounts: DiscountCode[];
   subGames: SubGame[];
   cms: Cms;
 };

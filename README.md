@@ -1,6 +1,6 @@
 # Frontend HubPlay
 
-Project build riêng, không gộp với backend. `.gitignore` bỏ `.env`, `.env.local`, `node_modules`, `.next`. Khi tách repo, copy cả thư mục `frontend/`. Trình duyệt gọi `/api/*` cùng origin. Next.js rewrite sang Nest theo `BACKEND_URL` trong env (xem `.env.example`). Không đặt nghiệp vụ trong Route Handler. Không dùng `NEXT_PUBLIC_` cho URL API.
+Project build riêng, không gộp với backend. Nút admin dùng `components/ui/button.tsx`. Icon dùng `lucide-react`. `.gitignore` bỏ `.env`, `.env.local`, `node_modules`, `.next`. Khi tách repo, copy cả thư mục `frontend/`. Trình duyệt gọi `/api/*` cùng origin. Next.js rewrite sang Nest theo `BACKEND_URL` trong env (xem `.env.example`). Không đặt nghiệp vụ trong Route Handler. Không dùng `NEXT_PUBLIC_` cho URL API.
 
 ```
 copy .env.example .env.local

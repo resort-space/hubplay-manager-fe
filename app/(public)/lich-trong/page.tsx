@@ -6,21 +6,23 @@ import type { Booking, Slot } from '@/lib/types';
 import { useHomeState } from '@/components/public-shell';
 
 export default function OpenSchedulePage() {
-  const { data, openRoom } = useHomeState();
+  const { data, venueId, openRoom } = useHomeState();
   const [date, setDate] = useState(isoDate(new Date()));
   const [roomId, setRoomId] = useState('');
   const [slots, setSlots] = useState<Slot[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
 
   useEffect(() => {
-    if (data?.rooms[0] && !roomId) setRoomId(data.rooms[0].id);
+    if (!data?.rooms.length) return;
+    if (!data.rooms.some((room) => room.id === roomId)) setRoomId(data.rooms[0].id);
   }, [data, roomId]);
 
   useEffect(() => {
     if (!roomId) return;
-    api<Slot[]>(`/api/v1/slots?roomId=${roomId}&date=${date}`).then(setSlots);
-    api<Booking[]>(`/api/v1/bookings?from=${date}&to=${date}`).then(setBookings);
-  }, [roomId, date]);
+    const venue = venueId ? `&venueId=${encodeURIComponent(venueId)}` : '';
+    api<Slot[]>(`/api/v1/slots?roomId=${roomId}&date=${date}${venue}`).then(setSlots);
+    api<Booking[]>(`/api/v1/bookings?from=${date}&to=${date}${venue}`).then(setBookings);
+  }, [roomId, date, venueId]);
 
   if (!data) return <p>Đang tải...</p>;
   const room = data.rooms.find((r) => r.id === roomId);

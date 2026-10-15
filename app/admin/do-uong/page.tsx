@@ -1,27 +1,36 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useAdminVenue, VenueBar } from '@/components/admin-venue';
+import { Button } from '@/components/ui/button';
 import { api, vnd } from '@/lib/api';
 import type { Drink, HomeData } from '@/lib/types';
 
 export default function DrinksPage() {
+  const scope = useAdminVenue();
   const [drinks, setDrinks] = useState<Drink[]>([]);
   const [name, setName] = useState('');
   const [price, setPrice] = useState(20000);
   async function load() {
-    const home = await api<HomeData>('/api/v1/home');
+    const home = await api<HomeData>(scope.path('/api/v1/home'));
     setDrinks(home.drinks);
   }
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    if (!scope.ready || (scope.isSystem && !scope.venueId)) return;
+    load();
+  }, [scope.ready, scope.venueId, scope.isSystem]);
   return (
-    <div className="mx-auto max-w-lg rounded-xl bg-white p-4 shadow">
-      <h1 className="mb-3 text-xl font-bold">Danh sách đồ uống</h1>
-      <form className="mb-4 flex gap-2" onSubmit={async (e) => { e.preventDefault(); await api('/api/v1/drinks', { method: 'POST', body: JSON.stringify({ name, price }) }); setName(''); load(); }}>
-        <input className="flex-1 rounded border px-2 py-1" value={name} onChange={(e) => setName(e.target.value)} placeholder="Tên" />
-        <input className="w-28 rounded border px-2 py-1" type="number" value={price} onChange={(e) => setPrice(Number(e.target.value))} />
-        <button className="rounded bg-blue-600 px-3 text-white">Thêm</button>
+    <div className="mx-auto max-w-lg">
+      <VenueBar venues={scope.venues} venueId={scope.venueId} onChange={scope.choose} />
+      <div className="admin-card">
+      <h1 className="admin-title mb-4">Danh sách đồ uống</h1>
+      <form className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-[1fr_8rem_auto]" onSubmit={async (e) => { e.preventDefault(); await api('/api/v1/drinks', { method: 'POST', body: JSON.stringify(scope.body({ name, price })) }); setName(''); load(); }}>
+        <input className="admin-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Tên" />
+        <input className="admin-input" type="number" value={price} onChange={(e) => setPrice(Number(e.target.value))} />
+        <Button type="submit">Thêm</Button>
       </form>
-      {drinks.map((d) => <p key={d.id} className="border-b py-2">{d.name} · {vnd(d.price)} đ</p>)}
+      {drinks.map((d) => <p key={d.id} className="border-b border-slate-100 py-3 text-sm">{d.name} · <span className="admin-money">{vnd(d.price)} đ</span></p>)}
+      </div>
     </div>
   );
 }

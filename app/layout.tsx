@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Door Escape Room',
-  description: 'Đặt phòng Door Escape Room',
+  title: 'Door Escape',
+  description: 'Đặt phòng Door Escape',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

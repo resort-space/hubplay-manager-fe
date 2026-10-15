@@ -1,40 +1,50 @@
 'use client';
 
 import { useState } from 'react';
+import { useAdminVenue, VenueBar } from '@/components/admin-venue';
+import { AdminSelect } from '@/components/ui/admin-select';
+import { Button } from '@/components/ui/button';
 import { api, vnd } from '@/lib/api';
 
 type Summary = { year: number; period: string; closedDays: number; escape: number; board: number; sat: number; fnb: number; game: number };
 
 export default function RevenuePage() {
+  const scope = useAdminVenue();
   const [year, setYear] = useState(new Date().getFullYear());
   const [period, setPeriod] = useState('year');
   const [data, setData] = useState<Summary | null>(null);
   const [error, setError] = useState('');
   return (
-    <div className="mx-auto max-w-lg rounded-xl bg-white p-4 shadow">
-      <h1 className="mb-3 text-xl font-bold">Thống kê doanh thu</h1>
-      <div className="mb-3 flex flex-wrap gap-2">
-        <input className="w-24 rounded border px-2 py-1" type="number" value={year} onChange={(e) => setYear(Number(e.target.value))} />
-        <select className="rounded border px-2 py-1" value={period} onChange={(e) => setPeriod(e.target.value)}>
-          <option value="year">Cả năm</option>
-          <option value="Q1">Quý 1</option>
-          <option value="Q2">Quý 2</option>
-          <option value="Q3">Quý 3</option>
-          <option value="Q4">Quý 4</option>
-          {Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0')).map((m) => <option key={m} value={m}>Tháng {m}</option>)}
-        </select>
-        <button className="rounded bg-blue-600 px-3 text-white" onClick={async () => { setError(''); try { setData(await api(`/api/v1/revenue/summary?year=${year}&period=${period}`)); } catch (e) { setError(e instanceof Error ? e.message : 'Không xem được'); } }}>Xem</button>
+    <div className="mx-auto max-w-lg">
+      <VenueBar venues={scope.venues} venueId={scope.venueId} onChange={(id) => { scope.choose(id); setData(null); }} />
+      <div className="admin-card">
+      <h1 className="admin-title mb-4">Thống kê doanh thu</h1>
+      <div className="mb-4 flex flex-col gap-2 sm:flex-row">
+        <input className="admin-input sm:w-28" type="number" value={year} onChange={(e) => setYear(Number(e.target.value))} />
+        <AdminSelect label="Kỳ thống kê" value={period} onChange={setPeriod} options={[{ value: 'year', label: 'Cả năm' }, { value: 'Q1', label: 'Quý 1' }, { value: 'Q2', label: 'Quý 2' }, { value: 'Q3', label: 'Quý 3' }, { value: 'Q4', label: 'Quý 4' }, ...Array.from({ length: 12 }, (_, i) => { const month = String(i + 1).padStart(2, '0'); return { value: month, label: `Tháng ${month}` }; })]} />
+        <Button onClick={async () => { setError(''); try { setData(await api(scope.path(`/api/v1/revenue/summary?year=${year}&period=${period}`))); } catch (e) { setError(e instanceof Error ? e.message : 'Không xem được'); } }}>Xem</Button>
       </div>
-      {error && <p className="text-red-600">{error}</p>}
+      {error && <p className="text-sm text-red-600">{error}</p>}
       {data && (
-        <div className="space-y-1 text-sm">
-          <p>Ngày đã chốt trong kỳ: {data.closedDays}</p>
-          <p>Escape: {vnd(data.escape)} đ</p>
-          <p>Board: {vnd(data.board)} đ</p>
-          <p>SAT: {vnd(data.sat)} đ</p>
-          <p>Đồ uống: {vnd(data.fnb)} đ</p>
+        <div className="grid grid-cols-2 gap-3">
+          <Stat label="Ngày đã chốt" value={String(data.closedDays)} />
+          <Stat label="Escape" value={`${vnd(data.escape)} đ`} />
+          <Stat label="Board" value={`${vnd(data.board)} đ`} />
+          <Stat label="SAT" value={`${vnd(data.sat)} đ`} />
+          <Stat label="Đồ uống" value={`${vnd(data.fnb)} đ`} />
+          <Stat label="Tổng phòng" value={`${vnd(data.game)} đ`} />
         </div>
       )}
+      </div>
+    </div>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl bg-slate-50 p-3">
+      <p className="admin-muted">{label}</p>
+      <p className="admin-label admin-money">{value}</p>
     </div>
   );
 }
