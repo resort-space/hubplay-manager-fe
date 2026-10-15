@@ -6,6 +6,10 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [{ source: '/api/:path*', destination: `${backendUrl}/api/:path*` }];
   },
+  webpack: (config) => {
+    config.resolve.fallback = { ...(config.resolve.fallback || {}), path: false, lna: false };
+    return config;
+  },
 };
 
 export default nextConfig;

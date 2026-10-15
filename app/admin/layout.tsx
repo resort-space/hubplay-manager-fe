@@ -12,7 +12,7 @@ import type { Me } from '@/lib/types';
 const links: { href: string; label: string; icon: LucideIcon; role: string }[] = [
   { href: '/admin/quay', label: 'Quầy', icon: CalendarDays, role: 'counter_admin' },
   { href: '/admin/phan-ca', label: 'Phân 13 ca', icon: Clock3, role: 'edit_admin' },
-  { href: '/admin/phong', label: 'Phòng & game', icon: DoorOpen, role: 'edit_admin' },
+  { href: '/admin/phong', label: 'Phòng', icon: DoorOpen, role: 'edit_admin' },
   { href: '/admin/do-uong', label: 'Đồ uống', icon: CupSoda, role: 'edit_admin' },
   { href: '/admin/ma-giam', label: 'Mã giảm', icon: BadgePercent, role: 'edit_admin' },
   { href: '/admin/noi-dung', label: 'Nội dung', icon: FileText, role: 'edit_admin' },

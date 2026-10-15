@@ -1,14 +1,33 @@
 'use client';
 
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useAdminVenue, VenueBar } from '@/components/admin-venue';
 import { AdminSelect } from '@/components/ui/admin-select';
 import { Button } from '@/components/ui/button';
 import { addDays, api, isoDate, startOfWeek, vnd } from '@/lib/api';
+import { printReceiptQuiet, QzRefused } from '@/lib/receipt-print';
 import type { Booking, HomeData, Me, Slot } from '@/lib/types';
 
-type Line = { description: string; qty: number; unitPrice: number; ledger: 'game' | 'fnb'; kind: 'subgame' | 'fnb_item' | 'extra_manual' | 'discount'; categoryKind?: string; code?: string };
+type Line = { description: string; qty: number; unitPrice: number; ledger: 'game' | 'fnb'; kind: 'subgame' | 'fnb_item' | 'extra_manual' | 'discount'; categoryKind?: string; categoryId?: string; subGameId?: string; playerCount?: number; code?: string };
 type PlaySession = { date: string; slotIndex: number; playerCount: number; sessionCode: string | null; room: { name: string } };
+type PrintSlip = {
+  venueName: string;
+  address: string;
+  head: string[];
+  rows: { description: string; qty: number; unitPrice: number }[];
+  total: number;
+  pay: string;
+  cashier: string;
+};
+const modeLabel: Record<string, string> = { escape: 'Đặt lịch', board: 'Theo giờ', sat: 'Một lần' };
+
+function formatSlip(slip: PrintSlip) {
+  const head = slip.head.length ? `${slip.head.join('\n')}\n--------------------------------\n` : '';
+  const cashierLine = slip.cashier ? `\nThu ngân: ${slip.cashier}` : '';
+  const rows = slip.rows.map((line) => `${line.description} x${line.qty}`.padEnd(24, ' ') + vnd(line.qty * line.unitPrice)).join('\n');
+  return `${slip.venueName}\n${slip.address}\n--------------------------------\n${head}${rows}\n--------------------------------\nTỔNG ${vnd(slip.total)}\nThanh toán: ${slip.pay}${cashierLine}`;
+}
 
 export default function QuayPage() {
   const scope = useAdminVenue();
@@ -16,7 +35,6 @@ export default function QuayPage() {
   const [cursor, setCursor] = useState(() => new Date());
   const [home, setHome] = useState<HomeData | null>(null);
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [roomId, setRoomId] = useState('');
   const [lines, setLines] = useState<Line[]>([]);
   const [phone, setPhone] = useState('');
   const [guestName, setGuestName] = useState('');
@@ -28,6 +46,15 @@ export default function QuayPage() {
   const [extraName, setExtraName] = useState('');
   const [extraPrice, setExtraPrice] = useState(0);
   const [extraQty, setExtraQty] = useState(1);
+  const [parentId, setParentId] = useState('');
+  const [childId, setChildId] = useState('');
+  const [playerCount, setPlayerCount] = useState(1);
+  const [hours, setHours] = useState(1);
+  const [playTime, setPlayTime] = useState('');
+  const [playSession, setPlaySession] = useState('');
+  const [receiptError, setReceiptError] = useState('');
+  const [printSlip, setPrintSlip] = useState<PrintSlip | null>(null);
+  const [mounted, setMounted] = useState(false);
   const [photoPhone, setPhotoPhone] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [cashier, setCashier] = useState('');
@@ -39,7 +66,6 @@ export default function QuayPage() {
   async function load() {
     const data = await api<HomeData>(scope.path('/api/v1/home'));
     setHome(data);
-    setRoomId((cur) => (data.rooms.some((room) => room.id === cur) ? cur : data.rooms[0]?.id || ''));
     const from = isoDate(days[0]);
     const to = isoDate(days[6]);
     setBookings(await api<Booking[]>(scope.path(`/api/v1/bookings?from=${from}&to=${to}`)));
@@ -51,6 +77,10 @@ export default function QuayPage() {
     if (seenVenue.current && seenVenue.current !== stamp) {
       setLines([]);
       setReceiptBookingId('');
+      setParentId('');
+      setChildId('');
+      setPlayTime('');
+      setPlaySession('');
     }
     seenVenue.current = stamp;
     load().catch(() => undefined);
@@ -58,10 +88,58 @@ export default function QuayPage() {
   useEffect(() => {
     api<{ user: Me }>('/api/v1/auth/me').then((r) => setCashier(r.user?.username || '')).catch(() => undefined);
   }, []);
+  const seenSlip = useRef<PrintSlip | null>(null);
+  useEffect(() => { setMounted(true); }, []);
+  useEffect(() => {
+    if (!printSlip) {
+      seenSlip.current = null;
+      return;
+    }
+    if (seenSlip.current === printSlip) return;
+    seenSlip.current = printSlip;
+    let closed = false;
+    function finish() {
+      if (closed) return;
+      closed = true;
+      window.removeEventListener('afterprint', finish);
+      setLines([]);
+      setGuestName('');
+      setReceiptBookingId('');
+      setPlayTime('');
+      setPlaySession('');
+      setPrintSlip(null);
+    }
+    printReceiptQuiet().then((sent) => {
+      if (seenSlip.current !== printSlip) return;
+      if (sent) {
+        finish();
+        return;
+      }
+      window.addEventListener('afterprint', finish);
+      requestAnimationFrame(() => window.print());
+    }).catch((err) => {
+      if (seenSlip.current !== printSlip) return;
+      if (err instanceof QzRefused) {
+        setReceiptError(`${err.message}. Chuột phải icon QZ Tray, mở Site Manager, chọn Allow cho trang này.`);
+        setPrintSlip(null);
+        return;
+      }
+      window.addEventListener('afterprint', finish);
+      requestAnimationFrame(() => window.print());
+    });
+    return () => window.removeEventListener('afterprint', finish);
+  }, [printSlip]);
 
   const slots: Slot[] = home?.slots || [];
-  const sessionPreview = playLines(bookings.find((item) => item.id === receiptBookingId));
+  const categories = [...(home?.categories || [])].sort((a, b) => Number(a.billMode !== 'escape') - Number(b.billMode !== 'escape') || a.name.localeCompare(b.name, 'vi'));
+  const billMode = categories.find((category) => category.id === parentId)?.billMode;
+  const walkIn = billMode === 'board' || billMode === 'sat';
+  const booked = bookings.find((item) => item.id === receiptBookingId);
+  const sessionPreview = playLines(billMode === 'escape' ? booked : undefined);
   const discountCode = lines.find((line) => line.kind === 'discount')?.code || '';
+  const children = (home?.subGames || []).filter((game) => game.category.id === parentId);
+  const child = children.find((game) => game.id === childId);
+  const escapeGameName = lines.find((line) => line.kind === 'subgame' && line.categoryKind === 'escape')?.description || (booked ? roomLine(booked.room.id)?.description : '');
 
   function bumpLine(match: (line: Line) => boolean, create: Line) {
     setLines((cur) => {
@@ -74,31 +152,30 @@ export default function QuayPage() {
   }
 
   function roomLine(forRoomId: string): Line | null {
-    const game = home?.subGames.find((g) => g.roomId === forRoomId) || home?.subGames[0];
+    const game = home?.subGames.find((item) => item.roomId === forRoomId && item.category.billMode === 'escape');
     if (!game) return null;
-    return { description: game.name, qty: 1, unitPrice: game.basePrice, ledger: 'game', kind: 'subgame', categoryKind: game.category.kind };
-  }
-
-  function addGame() {
-    const line = roomLine(roomId);
-    if (!line) return;
-    setLines((cur) => [...cur, line]);
+    return { description: game.name, qty: 1, unitPrice: game.basePrice, ledger: 'game', kind: 'subgame', categoryKind: 'escape', categoryId: game.category.id, subGameId: game.id };
   }
 
   function payBooking(booking: Booking) {
     setPhone(booking.phone);
     setGuestName(booking.guestName);
-    setRoomId(booking.room.id);
     const line = roomLine(booking.room.id);
-    if (receiptBookingId === booking.id) {
-      setLines((cur) => {
-        if (!line) return cur;
-        const exists = cur.some((row) => row.kind === 'subgame' && row.description === line.description && row.unitPrice === line.unitPrice);
-        return exists ? cur : [...cur, line];
-      });
-    } else {
-      setLines(line ? [line] : []);
-    }
+    const escapeId = line?.categoryId || home?.categories.find((category) => category.billMode === 'escape')?.id || '';
+    if (escapeId) setParentId(escapeId);
+    setChildId('');
+    setPlayTime('');
+    setPlaySession('');
+    setLines((cur) => {
+      const kept = cur.filter((row) => row.kind !== 'subgame');
+      if (!line) return kept;
+      const same = receiptBookingId === booking.id && cur.some((row) => row.kind === 'subgame' && row.subGameId === line.subGameId);
+      if (same) {
+        const existing = cur.find((row) => row.kind === 'subgame' && row.subGameId === line.subGameId);
+        return existing ? [...kept, existing] : kept;
+      }
+      return [...kept, line];
+    });
     setReceiptBookingId(booking.id);
   }
 
@@ -113,6 +190,38 @@ export default function QuayPage() {
     setLines((cur) => cur.filter((_, i) => i !== index));
   }
 
+  function chooseParent(id: string) {
+    if (id === parentId) return;
+    const next = home?.categories.find((category) => category.id === id);
+    setParentId(id);
+    setChildId('');
+    setLines((cur) => cur.filter((line) => line.kind !== 'subgame'));
+    if (!next || next.billMode === 'escape') {
+      setPlayTime('');
+      setPlaySession('');
+    }
+    if (!next || next.billMode !== 'escape') setReceiptBookingId('');
+  }
+
+  function addOtherGame() {
+    if (!child || !walkIn) return;
+    const players = Math.max(1, playerCount);
+    const hourly = billMode === 'board' && child.pricingUnit === 'per_hour';
+    const qty = hourly ? Math.max(1, hours) : 1;
+    const description = `${child.name} · ${players} người`;
+    setLines((cur) => {
+      const kept = cur.filter((line) => line.kind !== 'subgame' || line.categoryId === child.category.id);
+      const index = kept.findIndex((line) => line.kind === 'subgame' && line.subGameId === child.id && line.unitPrice === child.basePrice);
+      if (index >= 0) {
+        if (!hourly) return kept;
+        const next = [...kept];
+        next[index] = { ...next[index], qty: next[index].qty + qty, playerCount: players, description };
+        return next;
+      }
+      return [...kept, { description, qty, unitPrice: child.basePrice, ledger: 'game', kind: 'subgame', categoryKind: child.category.billMode, categoryId: child.category.id, subGameId: child.id, playerCount: players }];
+    });
+  }
+
   function applyDiscount(code: string) {
     setLines((cur) => {
       const rest = cur.filter((line) => line.kind !== 'discount');
@@ -121,6 +230,16 @@ export default function QuayPage() {
       if (!discount) return rest;
       return [...rest, { description: `Khuyến mãi ${discount.code}`, qty: 1, unitPrice: -discount.amount, ledger: 'game', kind: 'discount', code: discount.code }];
     });
+  }
+
+  function manualLines(time?: string, session?: string) {
+    if (!walkIn) return [];
+    const rows: string[] = [];
+    const when = (time ?? playTime).trim();
+    const shift = (session ?? playSession).trim();
+    if (when) rows.push(`Thời gian: ${when}`);
+    if (shift) rows.push(`Ca chơi: ${shift}`);
+    return rows;
   }
 
   function playLines(play: PlaySession | null | undefined) {
@@ -135,23 +254,23 @@ export default function QuayPage() {
   }
 
   async function printReceipt() {
-    const receipt = await api<{ bills: { lines: { description: string; qty: number; unitPrice: number }[] }[]; booking: PlaySession | null; venue: { name: string; address: string } }>('/api/v1/receipts', {
+    setReceiptError('');
+    const receipt = await api<{ bills: { lines: { description: string; qty: number; unitPrice: number }[] }[]; booking: PlaySession | null; playTime: string; playSession: string; venue: { name: string; address: string } }>('/api/v1/receipts', {
       method: 'POST',
-      body: JSON.stringify(scope.body({ phone, guestName, bookingId: receiptBookingId || undefined, paymentMethod: method, lines })),
+      body: JSON.stringify(scope.body({ phone, guestName, bookingId: billMode === 'escape' ? receiptBookingId || undefined : undefined, playTime: walkIn ? playTime : '', playSession: walkIn ? playSession : '', paymentMethod: method, lines })),
     });
-    const box = document.getElementById('bill-print');
-    if (box) {
-      const rows = receipt.bills.flatMap((b) => b.lines);
-      const total = rows.reduce((s, l) => s + l.qty * l.unitPrice, 0);
-      const head = [customerLabel() ? `Khách: ${customerLabel()}` : '', ...playLines(receipt.booking)].filter(Boolean).join('\n');
-      const customer = head ? `${head}\n--------------------------------\n` : '';
-      const cashierLine = cashier ? `\nThu ngân: ${cashier}` : '';
-      box.innerHTML = `<pre>${receipt.venue.name}\n${receipt.venue.address}\n--------------------------------\n${customer}${rows.map((l) => `${l.description} x${l.qty}`.padEnd(24, ' ') + vnd(l.qty * l.unitPrice)).join('\n')}\n--------------------------------\nTỔNG ${vnd(total)}\nThanh toán: ${method === 'cash' ? 'TIỀN MẶT' : 'CHUYỂN KHOẢN'}${cashierLine}</pre>`;
-    }
-    window.print();
-    setLines([]);
-    setGuestName('');
-    setReceiptBookingId('');
+    const rows = receipt.bills.flatMap((b) => b.lines);
+    const total = rows.reduce((s, l) => s + l.qty * l.unitPrice, 0);
+    const head = [customerLabel() ? `Khách: ${customerLabel()}` : '', ...playLines(receipt.booking), ...manualLines(receipt.playTime, receipt.playSession)].filter(Boolean);
+    setPrintSlip({
+      venueName: receipt.venue.name,
+      address: receipt.venue.address,
+      head,
+      rows,
+      total,
+      pay: method === 'cash' ? 'TIỀN MẶT' : 'CHUYỂN KHOẢN',
+      cashier,
+    });
   }
 
   function bookingCard(b: Booking) {
@@ -241,12 +360,45 @@ export default function QuayPage() {
       <aside className="space-y-4 lg:min-h-0 lg:overflow-y-auto">
         <div className="admin-card space-y-4">
           <h2 className="admin-label">Phiếu thu</h2>
+          <AdminSelect label="Phòng chơi" value={parentId} onChange={chooseParent} options={[{ value: '', label: 'Chọn phòng' }, ...categories.map((category) => ({ value: category.id, label: `${category.name} · ${modeLabel[category.billMode] || category.billMode}` }))]} />
           <div className="space-y-2">
             <p className="admin-muted">Thiết lập thông tin đơn</p>
             <input className="admin-input" placeholder="Tên khách" value={guestName} onChange={(e) => setGuestName(e.target.value)} />
             <input className="admin-input" placeholder="SĐT khách" value={phone} onChange={(e) => setPhone(e.target.value)} />
-            <AdminSelect label="Phòng" value={roomId} onChange={setRoomId} options={(home?.rooms || []).map((room) => ({ value: room.id, label: room.name }))} />
-            <Button variant="ghost" onClick={addGame}>Thêm phòng</Button>
+            {billMode === 'escape' && (booked ? (
+              <div className="space-y-1 rounded-xl bg-slate-50 p-3 text-sm">
+                {guestName.trim() && <p>{guestName.trim()}</p>}
+                {phone.trim() && <p>{phone.trim()}</p>}
+                {sessionPreview.map((row) => <p key={row}>{row}</p>)}
+                {escapeGameName && <p>{escapeGameName}</p>}
+              </div>
+            ) : (
+              <p className="admin-muted">Chọn ca trên lịch rồi bấm Thanh toán.</p>
+            ))}
+            {walkIn && (
+              <div className="space-y-2 rounded-xl bg-slate-50 p-3">
+                <AdminSelect label="Game" value={childId} onChange={setChildId} options={[{ value: '', label: 'Chọn game' }, ...children.map((game) => ({ value: game.id, label: game.name, hint: `${vnd(game.basePrice)} đ${game.pricingUnit === 'per_hour' ? '/giờ' : ''}` }))]} />
+                <label className="block space-y-1">
+                  <span className="admin-muted">Thời gian</span>
+                  <input className="admin-input" placeholder="Ví dụ 14:00–16:00" value={playTime} onChange={(event) => setPlayTime(event.target.value)} />
+                </label>
+                <label className="block space-y-1">
+                  <span className="admin-muted">Ca chơi</span>
+                  <input className="admin-input" placeholder="Ca chơi" value={playSession} onChange={(event) => setPlaySession(event.target.value)} />
+                </label>
+                <label className="block space-y-1">
+                  <span className="admin-muted">Số người</span>
+                  <input className="admin-input" type="number" min={1} value={playerCount} onChange={(event) => setPlayerCount(Math.max(1, Number(event.target.value) || 1))} />
+                </label>
+                {billMode === 'board' && child?.pricingUnit === 'per_hour' && (
+                  <label className="block space-y-1">
+                    <span className="admin-muted">Số giờ</span>
+                    <input className="admin-input" type="number" min={1} value={hours} onChange={(event) => setHours(Math.max(1, Number(event.target.value) || 1))} />
+                  </label>
+                )}
+                <Button variant="ghost" disabled={!childId} onClick={addOtherGame}>Thêm game</Button>
+              </div>
+            )}
             <AdminSelect searchable label="Đồ uống" value={drinkId} onChange={setDrinkId} options={[{ value: '', label: 'Đồ uống' }, ...(home?.drinks || []).map((drink) => ({ value: drink.id, label: drink.name, hint: `${vnd(drink.price)} đ` }))]} />
             <div className="grid grid-cols-[1fr_auto] gap-2">
               <input className="admin-input" type="number" min={1} aria-label="Số lượng đồ uống" placeholder="Số lượng" value={drinkQty} onChange={(e) => setDrinkQty(Math.max(1, Number(e.target.value) || 1))} />
@@ -302,7 +454,8 @@ export default function QuayPage() {
             <p className="my-2 border-t border-dashed border-slate-300" />
             {customerLabel() && <p>Khách: {customerLabel()}</p>}
             {sessionPreview.map((row) => <p key={row}>{row}</p>)}
-            {(customerLabel() || sessionPreview.length > 0) && <p className="my-2 border-t border-dashed border-slate-300" />}
+            {manualLines().map((row) => <p key={row}>{row}</p>)}
+            {(customerLabel() || sessionPreview.length > 0 || manualLines().length > 0) && <p className="my-2 border-t border-dashed border-slate-300" />}
             {lines.map((line) => (
               <div key={`${line.kind}-${line.description}-${line.unitPrice}`} className="mb-1 flex justify-between gap-2">
                 <span className="min-w-0 flex-1 truncate">{line.description} x{line.qty}</span>
@@ -316,7 +469,8 @@ export default function QuayPage() {
             {cashier && <p>Thu ngân: {cashier}</p>}
           </div>
           </div>
-          <Button className="w-full" disabled={!phone || !lines.length} onClick={printReceipt}>Lưu và in</Button>
+          {receiptError && <p className="text-sm text-red-600">{receiptError}</p>}
+          <Button className="w-full" disabled={!phone || !lines.length} onClick={() => printReceipt().catch((err) => setReceiptError(err instanceof Error ? err.message : 'Có lỗi'))}>Lưu và in</Button>
         </div>
         <form className="admin-card space-y-2" onSubmit={async (e) => {
           e.preventDefault();
@@ -335,7 +489,6 @@ export default function QuayPage() {
           <Button type="submit">Tải lên</Button>
         </form>
       </aside>
-      <div id="bill-print" />
     </div>
       {detail && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={() => setDetail(null)}>
@@ -352,6 +505,13 @@ export default function QuayPage() {
             <Button variant="ghost" onClick={() => setDetail(null)}>Đóng</Button>
           </div>
         </div>
+      )}
+      {mounted && printSlip && createPortal(
+        <div id="bill-print">
+          <pre>{formatSlip(printSlip)}</pre>
+          <div className="bill-feed" aria-hidden="true"><span /></div>
+        </div>,
+        document.body,
       )}
     </div>
   );

@@ -14,7 +14,7 @@ export default function HomePage() {
         <h1 className="mt-2 max-w-xl text-4xl font-bold">Phá án trong phòng tối</h1>
         <p className="mt-3 max-w-lg text-stone-300">{data.venue.address}</p>
       </section>
-      <h2 className="mb-4 text-2xl font-semibold">Tất cả phòng chơi</h2>
+      <h2 className="mb-4 text-2xl font-semibold">Game Doors Escape</h2>
       <div className="grid gap-4 sm:grid-cols-2">
         {data.rooms.map((room) => (
           <button key={room.id} onClick={() => openRoom(room)} className="rounded-xl border border-stone-800 bg-[#161311] p-5 text-left hover:border-[#e8c56b]">

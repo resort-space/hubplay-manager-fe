@@ -74,10 +74,54 @@ body { margin: 0; }
 .slot-on { outline: 2px solid #e8c56b; color: #e8c56b; }
 .btn-gold { background: #e8c56b; color: #1a1408; }
 .btn-gold:hover { background: #f0d48a; }
-@page { size: 80mm auto; margin: 2mm; }
-@media print {
-  body * { visibility: hidden; }
-  #bill-print, #bill-print * { visibility: visible; }
-  #bill-print { position: absolute; left: 0; top: 0; width: 72mm; font-family: ui-monospace, monospace; font-size: 12px; color: #000; background: #fff; }
+@page { size: 80mm auto; margin: 0; }
+@media screen {
+  #bill-print { position: fixed; left: -200vw; top: 0; width: 72mm; }
 }
-#bill-print { position: fixed; left: -200vw; top: 0; width: 72mm; }
+@media print {
+  html, body {
+    width: 80mm !important;
+    height: auto !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+  body > *:not(#bill-print) { display: none !important; }
+  #bill-print {
+    display: block !important;
+    position: static !important;
+    left: auto !important;
+    top: auto !important;
+    width: 72mm !important;
+    margin: 0 !important;
+    padding: 2mm !important;
+    font-family: "Courier New", Courier, monospace;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.35;
+    -webkit-font-smoothing: none;
+    color: #000 !important;
+    background: #fff !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+  #bill-print pre {
+    margin: 0;
+    white-space: pre-wrap;
+    font: inherit;
+    color: #000;
+  }
+  #bill-print .bill-feed {
+    display: flex !important;
+    align-items: flex-end;
+    justify-content: flex-end;
+    height: 60mm;
+  }
+  #bill-print .bill-feed span {
+    display: block !important;
+    width: 2px;
+    height: 2px;
+    background: #000;
+  }
+}

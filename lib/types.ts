@@ -1,15 +1,18 @@
 export type Venue = { id: string; code: string; name: string; address: string; phone: string; active?: boolean };
 export type Room = { id: string; name: string; code: string; capacity: number; description: string; active: boolean };
 export type Slot = { id: string; slotIndex: number; startTime: string; endTime: string; enabled: boolean; reserved?: boolean };
+export type GameCategory = { id: string; name: string; billMode: 'escape' | 'board' | 'sat'; subGames?: SubGame[] };
 export type SubGame = {
   id: string;
   name: string;
   code: string;
   basePrice: number;
+  pricingUnit: 'per_session' | 'per_hour';
   tags: string;
   active: boolean;
   roomId: string | null;
-  category: { kind: string; name: string };
+  categoryId?: string;
+  category: { id: string; billMode: string; name: string };
   room?: Room | null;
 };
 export type Drink = { id: string; name: string; price: number; active: boolean };
@@ -22,6 +25,7 @@ export type HomeData = {
   drinks: Drink[];
   discounts: DiscountCode[];
   subGames: SubGame[];
+  categories: GameCategory[];
   cms: Cms;
 };
 export type Booking = {

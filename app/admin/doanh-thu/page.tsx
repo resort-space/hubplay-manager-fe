@@ -6,7 +6,7 @@ import { AdminSelect } from '@/components/ui/admin-select';
 import { Button } from '@/components/ui/button';
 import { api, vnd } from '@/lib/api';
 
-type Summary = { year: number; period: string; closedDays: number; escape: number; board: number; sat: number; fnb: number; game: number };
+type Summary = { year: number; period: string; closedDays: number; fnb: number; game: number; categories: { id: string; name: string; total: number }[] };
 
 export default function RevenuePage() {
   const scope = useAdminVenue();
@@ -28,11 +28,9 @@ export default function RevenuePage() {
       {data && (
         <div className="grid grid-cols-2 gap-3">
           <Stat label="Ngày đã chốt" value={String(data.closedDays)} />
-          <Stat label="Escape" value={`${vnd(data.escape)} đ`} />
-          <Stat label="Board" value={`${vnd(data.board)} đ`} />
-          <Stat label="SAT" value={`${vnd(data.sat)} đ`} />
+          {data.categories.map((category) => <Stat key={category.id} label={category.name} value={`${vnd(category.total)} đ`} />)}
           <Stat label="Đồ uống" value={`${vnd(data.fnb)} đ`} />
-          <Stat label="Tổng phòng" value={`${vnd(data.game)} đ`} />
+          <Stat label="Tổng game" value={`${vnd(data.game)} đ`} />
         </div>
       )}
       </div>
