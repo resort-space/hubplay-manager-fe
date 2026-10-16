@@ -14,6 +14,14 @@ export function vnd(n: number) {
   return new Intl.NumberFormat('vi-VN').format(n);
 }
 
+export function priceFromInput(n: number) {
+  return Math.max(0, Math.round(n)) * 1000;
+}
+
+export function priceToInput(n: number) {
+  return Math.round(n / 1000);
+}
+
 export function isoDate(d: Date) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');

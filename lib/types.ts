@@ -38,6 +38,7 @@ export type Booking = {
   playerCount: number;
   status: 'pending_confirm' | 'confirmed' | 'cancelled';
   sessionCode: string | null;
+  paid?: boolean;
   room: Room;
 };
 export type Me = { id: string; username?: string; phone?: string; name?: string; role?: string; kind: 'admin' | 'user' } | null;

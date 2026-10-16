@@ -77,6 +77,7 @@ body { margin: 0; }
 @page { size: 80mm auto; margin: 0; }
 @media screen {
   #bill-print { position: fixed; left: -200vw; top: 0; width: 72mm; }
+  #bill-print .bill-logo { width: 40mm; height: auto; }
 }
 @media print {
   html, body {
@@ -111,6 +112,17 @@ body { margin: 0; }
     white-space: pre-wrap;
     font: inherit;
     color: #000;
+  }
+  #bill-print .bill-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 2mm;
+  }
+  #bill-print .bill-logo {
+    width: 40mm;
+    height: auto;
+    flex-shrink: 0;
   }
   #bill-print .bill-feed {
     display: flex !important;

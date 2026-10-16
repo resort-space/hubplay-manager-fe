@@ -2,18 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import { useAdminVenue, VenueBar } from '@/components/admin-venue';
-import { AdminSelect } from '@/components/ui/admin-select';
 import { Button } from '@/components/ui/button';
-import { api, vnd } from '@/lib/api';
+import { api, priceFromInput, priceToInput, vnd } from '@/lib/api';
 import type { GameCategory, SubGame } from '@/lib/types';
-
-const modeLabel: Record<string, string> = { escape: 'Đặt lịch', board: 'Theo giờ', sat: 'Một lần' };
 
 export default function RoomsPage() {
   const scope = useAdminVenue();
   const [categories, setCategories] = useState<GameCategory[]>([]);
   const [name, setName] = useState('');
-  const [mode, setMode] = useState<'board' | 'sat'>('sat');
   const [error, setError] = useState('');
   const ordered = [...categories].sort((a, b) => Number(a.billMode !== 'escape') - Number(b.billMode !== 'escape') || a.name.localeCompare(b.name, 'vi'));
 
@@ -34,7 +30,7 @@ export default function RoomsPage() {
           event.preventDefault();
           setError('');
           try {
-            await api('/api/v1/game-categories', { method: 'POST', body: JSON.stringify(scope.body({ name, billMode: mode })) });
+            await api('/api/v1/game-categories', { method: 'POST', body: JSON.stringify(scope.body({ name, billMode: 'board' })) });
             setName('');
             await load();
           } catch (err) {
@@ -43,7 +39,6 @@ export default function RoomsPage() {
         }}>
           <h1 className="admin-title">Thêm phòng</h1>
           <input className="admin-input" placeholder="Tên phòng" value={name} onChange={(event) => setName(event.target.value)} />
-          <AdminSelect label="Cách tính" value={mode} onChange={(next) => setMode(next as 'board' | 'sat')} options={[{ value: 'sat', label: 'Một lần' }, { value: 'board', label: 'Theo giờ' }]} />
           {error && <p className="text-sm text-red-600">{error}</p>}
           <Button type="submit">Thêm</Button>
         </form>
@@ -62,9 +57,8 @@ function RoomCard({ category, onChange, onError, body, path }: { category: GameC
   const [title, setTitle] = useState(category.name);
   const [gameName, setGameName] = useState('');
   const [gameCode, setGameCode] = useState('');
-  const [gamePrice, setGamePrice] = useState(category.billMode === 'escape' ? 350000 : 100000);
+  const [gamePrice, setGamePrice] = useState(category.billMode === 'escape' ? 350 : 100);
   const [capacity, setCapacity] = useState(6);
-  const [gameUnit, setGameUnit] = useState<'per_session' | 'per_hour'>('per_session');
   const [editing, setEditing] = useState<SubGame | null>(null);
   const escape = category.billMode === 'escape';
 
@@ -74,7 +68,6 @@ function RoomCard({ category, onChange, onError, body, path }: { category: GameC
     setEditing(null);
     setGameName('');
     setGameCode('');
-    setGameUnit('per_session');
     setCapacity(6);
   }
 
@@ -92,7 +85,7 @@ function RoomCard({ category, onChange, onError, body, path }: { category: GameC
     <section className="admin-card space-y-3">
       <div className="flex flex-wrap items-center gap-2">
         <input className="admin-input min-w-0 flex-1" aria-label="Tên phòng" value={title} onChange={(event) => setTitle(event.target.value)} />
-        <span className="admin-muted">{modeLabel[category.billMode] || category.billMode}</span>
+        {escape && <span className="admin-muted">Đặt lịch</span>}
         <Button variant="ghost" onClick={() => run(async () => { await api(`/api/v1/game-categories/${category.id}`, { method: 'PATCH', body: JSON.stringify(body({ name: title })) }); })}>Lưu tên</Button>
         <Button variant="ghost" onClick={() => run(async () => { await api(path(`/api/v1/game-categories/${category.id}`), { method: 'DELETE' }); })}>Xóa</Button>
       </div>
@@ -101,11 +94,11 @@ function RoomCard({ category, onChange, onError, body, path }: { category: GameC
         run(async () => {
           if (escape) {
             const room = await api<{ id: string }>('/api/v1/rooms', { method: 'POST', body: JSON.stringify(body({ id: editing?.room?.id, name: gameName, code: gameCode, capacity, ...(editing?.room ? { description: editing.room.description } : {}) })) });
-            await api('/api/v1/sub-games', { method: 'POST', body: JSON.stringify(body({ id: editing?.id, name: gameName, code: gameCode, basePrice: gamePrice, categoryId: category.id, roomId: room.id, tags: editing?.tags || 'kinh dị' })) });
+            await api('/api/v1/sub-games', { method: 'POST', body: JSON.stringify(body({ id: editing?.id, name: gameName, code: gameCode, basePrice: priceFromInput(gamePrice), categoryId: category.id, roomId: room.id, tags: editing?.tags || 'kinh dị' })) });
           } else {
             await api('/api/v1/sub-games', {
               method: 'POST',
-              body: JSON.stringify(body({ id: editing?.id, name: gameName, code: gameCode, basePrice: gamePrice, categoryId: category.id, pricingUnit: category.billMode === 'board' ? gameUnit : 'per_session' })),
+              body: JSON.stringify(body({ id: editing?.id, name: gameName, code: gameCode, basePrice: priceFromInput(gamePrice), categoryId: category.id, pricingUnit: 'per_session' })),
             });
           }
           resetGame();
@@ -118,12 +111,9 @@ function RoomCard({ category, onChange, onError, body, path }: { category: GameC
             <input className="admin-input mt-1" type="number" value={capacity} onChange={(event) => setCapacity(Number(event.target.value))} />
           </label>
         )}
-        <label className="admin-label">Giá
-          <input className="admin-input mt-1" type="number" value={gamePrice} onChange={(event) => setGamePrice(Number(event.target.value))} />
+        <label className="admin-label">Giá (nghìn đồng)
+          <input className="admin-input mt-1" type="number" min={0} value={gamePrice} onChange={(event) => setGamePrice(Number(event.target.value))} />
         </label>
-        {category.billMode === 'board' && (
-          <AdminSelect label="Cách tính" value={gameUnit} onChange={(next) => setGameUnit(next as 'per_session' | 'per_hour')} options={[{ value: 'per_session', label: 'Một lần' }, { value: 'per_hour', label: 'Theo giờ' }]} />
-        )}
         <Button type="submit">{editing ? 'Lưu game' : 'Thêm game'}</Button>
         {editing && <Button type="button" variant="ghost" onClick={resetGame}>Hủy sửa</Button>}
       </form>
@@ -132,9 +122,9 @@ function RoomCard({ category, onChange, onError, body, path }: { category: GameC
           <span className="min-w-0 flex-1">
             {game.code} · {game.name}{escape && game.room ? ` · ${game.room.capacity} người` : ''}
             <br />
-            <span className="admin-money admin-muted">{vnd(game.basePrice)} đ{game.pricingUnit === 'per_hour' ? ' / giờ' : ''}</span>
+            <span className="admin-money admin-muted">{vnd(game.basePrice)} đ</span>
           </span>
-          <Button variant="ghost" onClick={() => { setEditing(game); setGameName(game.name); setGameCode(game.code); setGamePrice(game.basePrice); setGameUnit(game.pricingUnit); setCapacity(game.room?.capacity || 6); }}>Sửa</Button>
+          <Button variant="ghost" onClick={() => { setEditing(game); setGameName(game.name); setGameCode(game.code); setGamePrice(priceToInput(game.basePrice)); setCapacity(game.room?.capacity || 6); }}>Sửa</Button>
           <Button variant="ghost" onClick={() => run(async () => {
             if (escape && game.room) await api(path(`/api/v1/rooms/${game.room.id}`), { method: 'DELETE' });
             else await api(path(`/api/v1/sub-games/${game.id}`), { method: 'DELETE' });
